@@ -59,9 +59,12 @@ void ParticleFilter::init(double gps_x, double gps_y, double gps_theta, double s
     p[i].sense_y.clear();
 
     this->particles.push_back(p[i]);
+
+//    cout << "Particle initialized: " << p[i].x << ", " << p[i].y << ", " << p[i].theta << endl;
   }
 
   this->is_initialized = true;
+
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
@@ -102,8 +105,10 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
       normal_distribution<double> dist_theta(theta1, std_theta);
 
       this->particles[i].x = dist_x(gen);
-      this->particles[i].y = dist_x(gen);
+      this->particles[i].y = dist_y(gen);
       this->particles[i].theta = dist_theta(gen);
+
+//      cout << "obsrv: " << this->particles[i].x << ", " << this->particles[i].y << "; ";
   }
 
 }
@@ -113,21 +118,30 @@ void transformObservations(ParticleFilter *pf, std::vector<LandmarkObs>& observa
   //The transfomation involves rotation followed by translation
 
   for (int i = 0; i < pf->particles.size(); i++) {
-    double x_center = pf->particles[i].x;
-    double y_center = pf->particles[i].y;
+    double center_x = pf->particles[i].x;
+    double center_y = pf->particles[i].y;
     double theta    = pf->particles[i].theta;
 
     for(int j = 0; j < observations.size(); j++) {
       double obs_x = observations[j].x;
       double obs_y = observations[j].y;
 
-      double sense_x = (x_center * cos(theta)) - (y_center * sin(theta)) + obs_x;
-      double sense_y = (x_center * sin(theta)) + (y_center * cos(theta)) + obs_y;
+//      double sense_x = (x_center * cos(theta)) - (y_center * sin(theta)) + obs_x;
+//      double sense_y = (x_center * sin(theta)) + (y_center * cos(theta)) + obs_y;
+
+      double sense_x = (obs_x * cos(theta)) - (obs_y * sin(theta)) + center_x;
+      double sense_y = (obs_x * sin(theta)) + (obs_y * cos(theta)) + center_y;
 
       pf->particles[i].sense_x.push_back(sense_x);
       pf->particles[i].sense_y.push_back(sense_y);
+
+//      cout << "center: " << center_x << ", " << center_y << ", " << theta << "; ";
+//      cout << "obs: " << obs_x << ", " << obs_y << "; ";
+//      cout << "sense: " << sense_x << ", " << sense_y << "; ";
+
     }
   }
+
 }
 
 void findNearestNeighbor(ParticleFilter *pf, Map map_landmarks) {
@@ -177,8 +191,6 @@ void findParticleWeight(ParticleFilter *pf, Map map_landmarks, double std_landma
       double pos_y = pf->particles[i].sense_y[j];
       int mark_id = pf->particles[i].associations[j];
 
-      //cout << "pos_x = " << pos_x << " pos_y = " << pos_y << endl;
-
       for(int k = 0; k < map_landmarks.landmark_list.size(); k++) {
 
         if(map_landmarks.landmark_list[k].id_i == mark_id) {
@@ -186,15 +198,10 @@ void findParticleWeight(ParticleFilter *pf, Map map_landmarks, double std_landma
           double land_mark_x = (double)map_landmarks.landmark_list[k].x_f;
           double land_mark_y = (double)map_landmarks.landmark_list[k].y_f;
 
-          //cout << "land_mark_x = " << land_mark_x << " land_mark_y = " << land_mark_y << endl;
-
           double val1 = 1 / (2 * M_PI * sig_x * sig_y);
           double val2 = ((pos_x - land_mark_x) * (pos_x - land_mark_x)) / (2 * sig_x * sig_x);
           double val3 = ((pos_y - land_mark_y) * (pos_y - land_mark_y)) / (2 * sig_y * sig_y);
         
-          //cout << "val2 = " << val2 << endl;
-          //cout << "val3 = " << val3 << endl;
-
           weight *= (val1 * exp(-(val2 + val3)));
 
           break;
@@ -249,8 +256,6 @@ void ParticleFilter::resample() {
     this->particles[j].sense_y.clear();
   }
 
-  this->weights.clear();
-
   for(int i = 0; i < this->num_particles; i++) {
     int p_idx = d(gen);
 
@@ -262,6 +267,7 @@ void ParticleFilter::resample() {
     }
   } 
 
+  this->weights.clear();
   this->particles.clear();
   this->particles = new_particles;
   
